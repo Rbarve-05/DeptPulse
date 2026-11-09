@@ -36,6 +36,7 @@ function App() {
   const [loading,setLoading] = useState(true)
   const [apiError,setApiError] = useState('')
   const [databaseStatus,setDatabaseStatus] = useState('checking')
+  const [emailStatus,setEmailStatus] = useState('not-configured')
   const [tab,setTab] = useState(0)
   const [modal,setModal] = useState(false)
   const [toast,setToast] = useState('')
@@ -59,7 +60,10 @@ function App() {
         const healthResponse = await fetch(`${API_URL}/health`)
         if (!healthResponse.ok) throw new Error('API health check failed.')
         const health = await healthResponse.json()
-        if (!cancelled) setDatabaseStatus(health.database === 'connected' ? 'connected' : 'disconnected')
+        if (!cancelled) {
+          setDatabaseStatus(health.database === 'connected' ? 'connected' : 'disconnected')
+          setEmailStatus(health.emailAutomationEnabled && health.emailConfigured ? 'enabled' : health.emailConfigured ? 'configured' : 'not-configured')
+        }
         const response = await fetch(`${API_URL}/invoices`)
         if (!response.ok) throw new Error('Could not load invoices from the server.')
         const data = await response.json()
@@ -79,7 +83,7 @@ function App() {
       const data = await response.json()
       if (!response.ok) throw new Error(data.message || 'Could not save this invoice.')
       setInvoices(old=>[data,...old]); setSelectedId(data.id); setTab(0); setModal(false); setForm({client:'',email:'',amount:'',days:''})
-      notify('Invoice saved to your database. Your chase sequence is ready to review.')
+      notify('Invoice saved to your database. Review and enable its reminder sequence when ready.')
     } catch (error) { setApiError(error.message || 'Unable to save invoice.') }
   }
   async function activate() {
@@ -89,13 +93,15 @@ function App() {
       const data = await response.json()
       if (!response.ok) throw new Error(data.message || 'Could not activate sequence.')
       setInvoices(old=>old.map(x=>x.id===data.id?data:x))
-      notify('Sequence status saved. Automated email delivery is not connected yet.')
+      notify(emailStatus === 'enabled' ? 'Reminder sequence enabled. The scheduler will send eligible reminders.' : 'Sequence enabled in the database. Configure and opt into email delivery to send reminders.')
     } catch (error) { setApiError(error.message || 'Unable to update sequence.') }
   }
   function copyEmail() {
     navigator.clipboard?.writeText(`Subject: ${currentStage.subject}\n\n${emailBody}`)
     setCopied(true); window.setTimeout(()=>setCopied(false),1800)
   }
+
+  const emailStatusLabel = emailStatus === 'enabled' ? 'Email automation enabled' : emailStatus === 'configured' ? 'Email configured · disabled' : 'Email automation not configured'
 
   return <div className="min-h-screen bg-[#09090b] text-zinc-100">
     <div className="pointer-events-none fixed inset-0 grid-glow opacity-[.18] [mask-image:linear-gradient(to_bottom,black,transparent_75%)]"/>
@@ -113,7 +119,7 @@ function App() {
         {apiError && <div className="mb-5 flex items-start justify-between gap-3 rounded-xl border border-rose-500/25 bg-rose-500/[.07] px-4 py-3 text-[11px] text-rose-200"><span>{apiError} Check that the API server is running and MongoDB is connected.</span><button onClick={()=>setApiError('')} aria-label="Dismiss error"><X size={14}/></button></div>}
         {loading && <div className="mb-5 rounded-xl border border-zinc-800 bg-zinc-900/60 px-4 py-3 text-[11px] text-zinc-400">Loading invoices from your database…</div>}
         <div className="mb-7 flex flex-col justify-between gap-5 md:flex-row md:items-end">
-          <div><div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.18em] text-emerald-400"><span className="h-px w-5 bg-emerald-400"/> Monday, 09 November 2026</div><div className="flex flex-wrap items-center gap-3"><h1 className="font-display text-[32px] font-semibold tracking-[-.04em] text-white sm:text-[38px]">Good afternoon, Studio team<span className="text-emerald-400">.</span></h1><span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/[.07] px-3 py-1.5 text-[10px] font-medium text-emerald-300"><span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50"/><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400"/></span>MongoDB-backed invoice tracking <span className="text-emerald-700">·</span> Email automation not connected</span></div><p className="mt-1.5 text-sm text-zinc-500">A clear view of what’s owed, what’s overdue, and what happens next.</p></div>
+          <div><div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.18em] text-emerald-400"><span className="h-px w-5 bg-emerald-400"/> Monday, 09 November 2026</div><div className="flex flex-wrap items-center gap-3"><h1 className="font-display text-[32px] font-semibold tracking-[-.04em] text-white sm:text-[38px]">Good afternoon, Studio team<span className="text-emerald-400">.</span></h1><span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/[.07] px-3 py-1.5 text-[10px] font-medium text-emerald-300"><span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50"/><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400"/></span>MongoDB-backed invoice tracking <span className="text-emerald-700">·</span>{emailStatusLabel}</span></div><p className="mt-1.5 text-sm text-zinc-500">A clear view of what’s owed, what’s overdue, and what happens next.</p></div>
           <button onClick={()=>setModal(true)} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 text-[12px] font-bold text-zinc-950 shadow-[0_8px_28px_rgba(52,211,153,.13)] transition hover:bg-emerald-300 active:scale-[.98]"><Plus size={16} strokeWidth={2.5}/> Add new late invoice</button>
         </div>
 
@@ -135,7 +141,7 @@ function App() {
               {filtered.map(item=><button key={item.id} onClick={()=>{setSelectedId(item.id);setTab(0)}} className={`group grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-5 py-4 text-left transition hover:bg-zinc-800/35 sm:grid-cols-[minmax(0,1.3fr)_minmax(100px,.7fr)_minmax(130px,1fr)_32px] ${selectedId===item.id?'bg-emerald-400/[.045]':''}`}>
                 <div className="flex min-w-0 items-center gap-3"><div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${item.color} text-[11px] font-bold text-zinc-200 ring-1 ring-white/5`}>{item.initials}</div><div className="min-w-0"><div className="truncate text-[12px] font-semibold text-zinc-200">{item.client}</div><div className="mt-1 truncate text-[10px] text-zinc-500">{item.project || 'Creative production'} <span className="px-1 text-zinc-700">·</span> <span className="text-zinc-600">{item.id}</span></div></div></div>
                 <div className="text-right sm:text-left"><div className="text-[12px] font-semibold tabular-nums text-zinc-200">{money(item.amount)}</div><div className="mt-1 text-[10px] text-zinc-600 sm:hidden">Amount due</div></div>
-                <div className="col-span-2 flex items-center justify-between sm:col-span-1 sm:block"><StagePill days={item.days}/><span className={`mt-1.5 block text-[10px] ${item.active?'text-emerald-500':'text-zinc-600'}`}>{item.active?'● Sequence active':'○ Awaiting activation'}</span></div>
+                <div className="col-span-2 flex items-center justify-between sm:col-span-1 sm:block"><StagePill days={item.days}/><span className={`mt-1.5 block text-[10px] ${item.automationEnabled?'text-emerald-500':item.active?'text-zinc-500':'text-zinc-600'}`}>{item.automationEnabled?'● Reminder sequence enabled':item.active?'● Sequence active · email opt-in needed':'○ Awaiting activation'}</span></div>
                 <ChevronRight size={15} className="hidden text-zinc-600 transition group-hover:translate-x-0.5 group-hover:text-emerald-400 sm:block"/>
               </button>)}
               {!loading && filtered.length===0&&<div className="px-5 py-12 text-center text-xs text-zinc-500">No invoices match your search.</div>}
@@ -159,9 +165,9 @@ function App() {
                   <div className="flex items-center justify-between border-b border-zinc-800 px-3.5 py-3"><div className="flex min-w-0 items-center gap-2 text-[10px] text-zinc-500"><Mail size={13}/><span className="truncate">To: {selected.email}</span></div><button onClick={copyEmail} className="flex shrink-0 items-center gap-1 text-[10px] text-zinc-500 hover:text-emerald-400">{copied?<Check size={12}/>:<Copy size={12}/>} {copied?'Copied':'Copy'}</button></div>
                   <div className="px-3.5 py-3"><div className="text-[10px] font-semibold text-zinc-300">Subject: <span className="font-normal text-zinc-400">{tab===0?`Quick heads-up regarding invoice #${selected.id.replace('INV-','')} for ${selected.client}`:currentStage.subject}</span></div><pre className="mt-3 whitespace-pre-wrap font-sans text-[10.5px] leading-[1.75] text-zinc-400">{emailBody}</pre></div>
                 </div>
-                <div className="mt-4 flex items-start gap-2 rounded-lg border border-zinc-800/80 bg-zinc-900/50 p-3"><CalendarClock size={14} className="mt-0.5 shrink-0 text-emerald-400"/><p className="text-[10px] leading-relaxed text-zinc-500">Sequence timing is based on the invoice due date. You can review each message before activating.</p></div>
-                <button onClick={activate} disabled={selected.active} className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 text-[11px] font-bold text-zinc-950 shadow-[0_8px_28px_rgba(52,211,153,.12)] transition hover:bg-emerald-300 disabled:cursor-default disabled:bg-emerald-400/15 disabled:text-emerald-300"><Zap size={15} fill="currentColor"/>{selected.active?'Sequence is active':'Activate automated sequence'}</button>
-                <p className="mt-2 text-center text-[9px] text-zinc-600">Invoice and sequence status are saved · Email delivery is not connected</p>
+                <div className="mt-4 flex items-start gap-2 rounded-lg border border-zinc-800/80 bg-zinc-900/50 p-3"><CalendarClock size={14} className="mt-0.5 shrink-0 text-emerald-400"/><p className="text-[10px] leading-relaxed text-zinc-500">Sequence timing is based on the invoice due date. Emails are sent only after you enable the sequence and turn on email automation in your private environment settings.</p></div>
+                <button onClick={activate} disabled={Boolean(selected.automationEnabled)} className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 text-[11px] font-bold text-zinc-950 shadow-[0_8px_28px_rgba(52,211,153,.12)] transition hover:bg-emerald-300 disabled:cursor-default disabled:bg-emerald-400/15 disabled:text-emerald-300"><Zap size={15} fill="currentColor"/>{selected.automationEnabled?'Reminder sequence enabled':'Enable reminder sequence'}</button>
+                <p className="mt-2 text-center text-[9px] text-zinc-600">{selected.remindersSent?.length || 0} reminders sent · Email provider: {emailStatus === 'enabled' ? 'enabled' : emailStatus === 'configured' ? 'configured but paused' : 'not configured'}</p>
               </div>
             </>:<div className="p-8 text-center text-xs text-zinc-500">Add an invoice to build an escalation plan.</div>}
           </div>
