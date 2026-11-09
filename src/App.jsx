@@ -35,6 +35,7 @@ function App() {
   const [selectedId,setSelectedId] = useState(null)
   const [loading,setLoading] = useState(true)
   const [apiError,setApiError] = useState('')
+  const [databaseStatus,setDatabaseStatus] = useState('checking')
   const [tab,setTab] = useState(0)
   const [modal,setModal] = useState(false)
   const [toast,setToast] = useState('')
@@ -55,11 +56,15 @@ function App() {
     let cancelled = false
     async function loadInvoices() {
       try {
+        const healthResponse = await fetch(`${API_URL}/health`)
+        if (!healthResponse.ok) throw new Error('API health check failed.')
+        const health = await healthResponse.json()
+        if (!cancelled) setDatabaseStatus(health.database === 'connected' ? 'connected' : 'disconnected')
         const response = await fetch(`${API_URL}/invoices`)
         if (!response.ok) throw new Error('Could not load invoices from the server.')
         const data = await response.json()
         if (!cancelled) { setInvoices(data); setSelectedId(data[0]?.id || null); setApiError('') }
-      } catch (error) { if (!cancelled) setApiError(error.message || 'Unable to connect to the DebtPulse API.') }
+      } catch (error) { if (!cancelled) { setDatabaseStatus('disconnected'); setApiError(error.message || 'Unable to connect to the DebtPulse API.') } }
       finally { if (!cancelled) setLoading(false) }
     }
     loadInvoices()
@@ -141,7 +146,7 @@ function App() {
           <div className="panel overflow-hidden rounded-2xl">
             <div className="flex items-start justify-between border-b border-zinc-800/80 p-5">
               <div><div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[.16em] text-emerald-400"><Sparkles size={13}/> Smart follow-up studio</div><h2 className="mt-2 font-display text-[17px] font-semibold">Escalation plan</h2><p className="mt-1 text-[11px] text-zinc-500">Personalized emails, ready when you are.</p></div>
-              <div className="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/[.06] px-2.5 py-2"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400"/><span className="text-[9px] font-semibold text-emerald-300">Database connected</span></div>
+              <div className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 ${databaseStatus === 'connected' ? 'border-emerald-500/20 bg-emerald-500/[.06]' : 'border-amber-500/20 bg-amber-500/[.06]'}`}><span className={`h-1.5 w-1.5 rounded-full ${databaseStatus === 'connected' ? 'bg-emerald-400' : 'bg-amber-400'}`}/><span className={`text-[9px] font-semibold ${databaseStatus === 'connected' ? 'text-emerald-300' : 'text-amber-300'}`}>{databaseStatus === 'connected' ? 'Database connected' : databaseStatus === 'checking' ? 'Checking database…' : 'Database offline'}</span></div>
             </div>
             {selected ? <>
               <div className="flex items-center justify-between gap-3 border-b border-zinc-800/70 bg-zinc-900/40 px-5 py-3"><div className="min-w-0"><div className="truncate text-[12px] font-semibold">{selected.client}</div><div className="mt-0.5 truncate text-[10px] text-zinc-500">{selected.email}</div></div><div className="shrink-0 text-right"><div className="text-[13px] font-bold tabular-nums">{money(selected.amount)}</div><div className="text-[9px] text-zinc-500">Outstanding</div></div></div>
