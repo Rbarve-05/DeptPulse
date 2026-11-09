@@ -6,7 +6,7 @@ router.get('/',async(_req,res,next)=>{try{const docs=await Invoice.find().sort({
 router.post('/',async(req,res,next)=>{try{
  const {client,email,amount,days,project}=req.body
  if(!client?.trim()||!email?.trim()||!Number.isFinite(Number(amount))||Number(amount)<1||!Number.isInteger(Number(days))||Number(days)<0)return res.status(400).json({message:'Enter a client, valid email, positive amount, and non-negative whole number of overdue days.'})
- const initials=client.trim().split(/\\s+/).slice(0,2).map(p=>p[0]).join('').toUpperCase()
+ const initials=client.trim().split(/\s+/).slice(0,2).map(p=>p[0]).join('').toUpperCase()
  const id=`INV-${Date.now().toString().slice(-8)}`
  const doc=await Invoice.create({id,client,email,amount:Number(amount),days:Number(days),project:project||'New creative production project',initials})
  res.status(201).json(serialize(doc))
