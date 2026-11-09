@@ -1,20 +1,31 @@
 # DebtPulse
 
-A premium, dark-mode receivables dashboard prototype for boutique creative agencies.
+A premium receivables dashboard for boutique creative agencies, built with React, Vite, Express, and MongoDB.
 
 ## Features
-- Outstanding balance, overdue invoice count, and average delinquency stats
-- Add-invoice modal with client, email, amount, and overdue-day fields
-- Searchable and filterable chase queue
+- MongoDB-backed invoice persistence
+- REST API to list and create invoices and activate a chase sequence
+- Starter demo invoices inserted only when the database is empty
+- Searchable and filterable chase queue with live dashboard totals
 - Three personalized escalation email templates (Day 1, Day 5, Day 14)
-- Copy-ready email previews and interactive sequence activation state
-- Responsive layout with Tailwind CSS and Lucide icons
+- Responsive dark UI with Tailwind CSS and Lucide icons
 
-## Run locally
-```bash
-npm install
-npm run dev
-```
+## Setup
+1. Install dependencies: `npm install`
+2. Create a free MongoDB Atlas cluster and database user. In Atlas Network Access, allow your current IP address.
+3. Copy `.env.example` to `.env` in the project root and replace the placeholder `MONGODB_URI` with your Atlas connection string. Never commit your real `.env` file.
+4. Start backend and frontend together: `npm run dev:full`
 
-## Notes
-This is a frontend-only demonstration. Invoice data is held in React state and resets on refresh. Activating a sequence changes the local demo state only; no emails are sent and no database or background scheduler is connected.
+Frontend: http://localhost:5173  
+API health: http://localhost:5000/api/health
+
+You can also run `npm run server` and `npm run dev` in separate terminals.
+
+## API
+- `GET /api/invoices` — list invoices
+- `POST /api/invoices` — create an invoice
+- `PATCH /api/invoices/:id/activate` — persist sequence activation status
+- `GET /api/health` — API and database status
+
+## Current limitations
+Invoice records and sequence activation are persisted. Email delivery, scheduled jobs, authentication, and multi-workspace access are not implemented yet. Starter records are demo data and are inserted only when the collection is empty.
