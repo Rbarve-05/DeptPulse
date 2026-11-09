@@ -7,9 +7,9 @@ import {
 } from 'lucide-react'
 
 const initialInvoices = [
-  { id:'INV-2048', client:'Northstar Films', email:'accounts@northstarfilms.co', amount:68000, days:14, active:true, initials:'NF', color:'from-violet-500/25 to-indigo-500/10' },
-  { id:'INV-2043', client:'Form & Field Studio', email:'finance@formandfield.studio', amount:42500, days:7, active:true, initials:'FF', color:'from-amber-500/20 to-orange-500/10' },
-  { id:'INV-2039', client:'Goodfolk Creative', email:'hello@goodfolkcreative.com', amount:34500, days:3, active:false, initials:'GC', color:'from-cyan-500/20 to-sky-500/10' },
+  { id:'INV-2049', client:'PixelCraft Cinema', email:'accounts@pixelcraftcinema.com', project:'Music Video Post-Production', amount:68000, days:14, active:true, initials:'PC', color:'from-violet-500/25 to-indigo-500/10' },
+  { id:'INV-2046', client:'Apex Marketing Group', email:'finance@apexmarketinggroup.co', project:'3D Brand Animation Campaign', amount:42500, days:7, active:true, initials:'AM', color:'from-amber-500/20 to-orange-500/10' },
+  { id:'INV-2044', client:'Vanguard Fashion Film Co.', email:'production@vanguardfashionfilm.co', project:'Luxury Collection Campaign Film', amount:34500, days:2, active:false, initials:'VF', color:'from-cyan-500/20 to-sky-500/10' },
 ]
 
 const money = n => new Intl.NumberFormat('en-IN', { style:'currency', currency:'INR', maximumFractionDigits:0 }).format(n)
@@ -21,7 +21,7 @@ const stages = [
 
 function StagePill({days}) {
   const stage = days >= 14 ? stages[2] : days >= 5 ? stages[1] : stages[0]
-  const cls = stage.tone === 'red' ? 'bg-rose-500/10 text-rose-300 ring-rose-500/20' : stage.tone === 'amber' ? 'bg-amber-500/10 text-amber-300 ring-amber-500/20' : 'bg-emerald-500/10 text-emerald-300 ring-emerald-500/20'
+  const cls = stage.tone === 'red' ? 'bg-rose-500/10 text-rose-300 ring-rose-500/20' : stage.tone === 'amber' ? 'bg-amber-500/10 text-amber-300 ring-amber-500/20' : 'bg-sky-500/10 text-sky-300 ring-sky-500/20'
   return <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${cls}`}><span className="h-1.5 w-1.5 rounded-full bg-current"/>{`Day ${days}: ${stage.short}`}</span>
 }
 
@@ -30,7 +30,7 @@ function StatCard({label,value,detail,icon:Icon,accent='emerald',trend}) {
   return <div className="panel rounded-2xl p-5 transition hover:border-zinc-600/80">
     <div className="flex items-center justify-between"><span className="text-[12px] font-medium tracking-wide text-zinc-400">{label}</span><span className={`grid h-9 w-9 place-items-center rounded-xl ${colors[accent]}`}><Icon size={17}/></span></div>
     <div className="mt-4 flex items-end justify-between gap-2"><div className="font-display text-[27px] font-semibold tracking-tight text-zinc-100">{value}</div>{trend && <span className="mb-1 flex items-center gap-1 text-[11px] font-medium text-emerald-400"><ArrowDownRight size={13}/>{trend}</span>}</div>
-    <p className="mt-1.5 text-[11px] text-zinc-500">{detail}</p>
+    {label === 'TOTAL OUTSTANDING BALANCE' ? <><svg viewBox="0 0 260 34" className="mt-3 h-8 w-full overflow-visible" preserveAspectRatio="none" aria-label="30 day outstanding balance trend"><defs><linearGradient id="sparkFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#34d399" stopOpacity=".22"/><stop offset="100%" stopColor="#34d399" stopOpacity="0"/></linearGradient></defs><path d="M0 27 C12 26 14 18 27 20 S45 27 57 17 S75 14 87 18 S105 10 117 13 S135 21 147 12 S164 9 177 13 S195 5 207 9 S230 6 260 2 L260 34 L0 34Z" fill="url(#sparkFill)"/><path d="M0 27 C12 26 14 18 27 20 S45 27 57 17 S75 14 87 18 S105 10 117 13 S135 21 147 12 S164 9 177 13 S195 5 207 9 S230 6 260 2" fill="none" stroke="#34d399" strokeWidth="1.8" strokeLinecap="round" vectorEffect="non-scaling-stroke"/></svg><p className="mt-1 text-[10px] text-zinc-500">{detail} <span className="text-zinc-700">·</span> 30-day trend</p></> : <p className="mt-1.5 text-[11px] text-zinc-500">{detail}</p>}
   </div>
 }
 
@@ -50,12 +50,12 @@ function App() {
   const avg = invoices.length ? Math.round(invoices.reduce((s,x)=>s+x.days,0)/invoices.length) : 0
   const filtered = useMemo(()=>invoices.filter(x=>(x.client.toLowerCase().includes(search.toLowerCase()) || x.id.toLowerCase().includes(search.toLowerCase())) && (filter==='all' || (filter==='active'?x.active:!x.active))),[invoices,search,filter])
   const currentStage = stages[tab]
-  const emailBody = selected ? currentStage.body(selected.client,money(selected.amount)) : ''
+  const emailBody = selected ? currentStage.body(selected.client,money(selected.amount)).replace(/invoice /i, `invoice #${selected.id.replace('INV-','')} `) : ''
   const notify = msg => { setToast(msg); window.clearTimeout(window.__debtToast); window.__debtToast = window.setTimeout(()=>setToast(''),3800) }
 
   function addInvoice(e) {
     e.preventDefault()
-    const item = { id:`INV-${Math.floor(2050+Math.random()*7000)}`, client:form.client.trim(), email:form.email.trim(), amount:Number(form.amount), days:Number(form.days), active:false, initials:form.client.trim().split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase(), color:'from-emerald-500/20 to-teal-500/10' }
+    const item = { id:`INV-${Math.floor(2050+Math.random()*7000)}`, client:form.client.trim(), email:form.email.trim(), project:'New creative production project', amount:Number(form.amount), days:Number(form.days), active:false, initials:form.client.trim().split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase(), color:'from-emerald-500/20 to-teal-500/10' }
     setInvoices(old=>[item,...old]); setSelectedId(item.id); setTab(0); setModal(false); setForm({client:'',email:'',amount:'',days:''})
     notify('Invoice added. Your chase sequence is ready to review.')
   }
@@ -74,7 +74,7 @@ function App() {
       <header className="flex h-[76px] items-center justify-between border-b border-zinc-800/80">
         <div className="flex items-center gap-3">
           <div className="relative grid h-9 w-9 place-items-center rounded-xl bg-emerald-400 text-zinc-950 shadow-[0_0_28px_rgba(52,211,153,.2)]"><Activity size={20} strokeWidth={2.7}/></div>
-          <div><div className="font-display text-[17px] font-bold tracking-tight">DebtPulse<span className="text-emerald-400">.</span></div><div className="text-[9px] font-semibold uppercase tracking-[.19em] text-zinc-500">Receivables, in rhythm</div></div>
+          <div><div className="font-display text-[17px] font-bold tracking-tight">DebtPulse<span className="text-emerald-400">.</span></div><div className="text-[9px] font-semibold tracking-[.06em] text-zinc-500">Automated Accounts Receivable for Creative Studios</div></div>
         </div>
         <div className="hidden items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/70 px-3 py-1.5 text-[11px] text-zinc-400 sm:flex"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"/> Workspace live <span className="mx-1 text-zinc-700">·</span> Demo mode</div>
         <div className="flex items-center gap-3"><button className="relative grid h-9 w-9 place-items-center rounded-xl border border-zinc-800 text-zinc-400 hover:bg-zinc-800"><Bell size={16}/><span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-emerald-400"/></button><div className="grid h-9 w-9 place-items-center rounded-full border border-zinc-700 bg-gradient-to-br from-zinc-600 to-zinc-800 text-[11px] font-bold">ST</div></div>
@@ -82,7 +82,7 @@ function App() {
 
       <main className="pt-9">
         <div className="mb-7 flex flex-col justify-between gap-5 md:flex-row md:items-end">
-          <div><div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.18em] text-emerald-400"><span className="h-px w-5 bg-emerald-400"/> Monday, 09 November 2026</div><h1 className="font-display text-[32px] font-semibold tracking-[-.04em] text-white sm:text-[38px]">Good afternoon, Studio team<span className="text-emerald-400">.</span></h1><p className="mt-1.5 text-sm text-zinc-500">A clear view of what’s owed, what’s overdue, and what happens next.</p></div>
+          <div><div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.18em] text-emerald-400"><span className="h-px w-5 bg-emerald-400"/> Monday, 09 November 2026</div><div className="flex flex-wrap items-center gap-3"><h1 className="font-display text-[32px] font-semibold tracking-[-.04em] text-white sm:text-[38px]">Good afternoon, Studio team<span className="text-emerald-400">.</span></h1><span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/[.07] px-3 py-1.5 text-[10px] font-medium text-emerald-300"><span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50"/><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400"/></span>System Status: Active Monitoring <span className="text-emerald-700">·</span> 4 webhooks connected</span></div><p className="mt-1.5 text-sm text-zinc-500">A clear view of what’s owed, what’s overdue, and what happens next.</p></div>
           <button onClick={()=>setModal(true)} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 text-[12px] font-bold text-zinc-950 shadow-[0_8px_28px_rgba(52,211,153,.13)] transition hover:bg-emerald-300 active:scale-[.98]"><Plus size={16} strokeWidth={2.5}/> Add new late invoice</button>
         </div>
 
@@ -102,7 +102,7 @@ function App() {
             <div className="hidden grid-cols-[minmax(0,1.3fr)_minmax(100px,.7fr)_minmax(130px,1fr)_32px] gap-3 px-5 py-3 text-[9px] font-bold uppercase tracking-[.15em] text-zinc-600 sm:grid"><span>Client / invoice</span><span>Amount</span><span>Escalation status</span><span/></div>
             <div className="divide-y divide-zinc-800/70">
               {filtered.map(item=><button key={item.id} onClick={()=>{setSelectedId(item.id);setTab(0)}} className={`group grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-5 py-4 text-left transition hover:bg-zinc-800/35 sm:grid-cols-[minmax(0,1.3fr)_minmax(100px,.7fr)_minmax(130px,1fr)_32px] ${selectedId===item.id?'bg-emerald-400/[.045]':''}`}>
-                <div className="flex min-w-0 items-center gap-3"><div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${item.color} text-[11px] font-bold text-zinc-200 ring-1 ring-white/5`}>{item.initials}</div><div className="min-w-0"><div className="truncate text-[12px] font-semibold text-zinc-200">{item.client}</div><div className="mt-1 text-[10px] text-zinc-600">{item.id} <span className="px-1">·</span> {item.days} days overdue</div></div></div>
+                <div className="flex min-w-0 items-center gap-3"><div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${item.color} text-[11px] font-bold text-zinc-200 ring-1 ring-white/5`}>{item.initials}</div><div className="min-w-0"><div className="truncate text-[12px] font-semibold text-zinc-200">{item.client}</div><div className="mt-1 truncate text-[10px] text-zinc-500">{item.project || 'Creative production'} <span className="px-1 text-zinc-700">·</span> <span className="text-zinc-600">{item.id}</span></div></div></div>
                 <div className="text-right sm:text-left"><div className="text-[12px] font-semibold tabular-nums text-zinc-200">{money(item.amount)}</div><div className="mt-1 text-[10px] text-zinc-600 sm:hidden">Amount due</div></div>
                 <div className="col-span-2 flex items-center justify-between sm:col-span-1 sm:block"><StagePill days={item.days}/><span className={`mt-1.5 block text-[10px] ${item.active?'text-emerald-500':'text-zinc-600'}`}>{item.active?'● Sequence active':'○ Awaiting activation'}</span></div>
                 <ChevronRight size={15} className="hidden text-zinc-600 transition group-hover:translate-x-0.5 group-hover:text-emerald-400 sm:block"/>
@@ -115,18 +115,18 @@ function App() {
           <div className="panel overflow-hidden rounded-2xl">
             <div className="flex items-start justify-between border-b border-zinc-800/80 p-5">
               <div><div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[.16em] text-emerald-400"><Sparkles size={13}/> Smart follow-up studio</div><h2 className="mt-2 font-display text-[17px] font-semibold">Escalation plan</h2><p className="mt-1 text-[11px] text-zinc-500">Personalized emails, ready when you are.</p></div>
-              <button onClick={()=>setModal(true)} className="grid h-8 w-8 place-items-center rounded-lg border border-zinc-800 text-zinc-500 hover:text-zinc-200"><MoreHorizontal size={16}/></button>
+              <div className="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/[.06] px-2.5 py-2"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400"/><span className="text-[9px] font-semibold text-emerald-300">Automated Follow-up Mode: ON</span></div>
             </div>
             {selected ? <>
               <div className="flex items-center justify-between gap-3 border-b border-zinc-800/70 bg-zinc-900/40 px-5 py-3"><div className="min-w-0"><div className="truncate text-[12px] font-semibold">{selected.client}</div><div className="mt-0.5 truncate text-[10px] text-zinc-500">{selected.email}</div></div><div className="shrink-0 text-right"><div className="text-[13px] font-bold tabular-nums">{money(selected.amount)}</div><div className="text-[9px] text-zinc-500">Outstanding</div></div></div>
               <div className="grid grid-cols-3 gap-2 px-5 pt-4">
-                {stages.map((s,i)=><button key={s.day} onClick={()=>setTab(i)} className={`rounded-xl border px-2 py-3 text-left transition ${tab===i?'border-emerald-400/40 bg-emerald-400/[.08]':'border-zinc-800 bg-zinc-900/40 hover:border-zinc-700'}`}><div className={`mb-2 flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold ${tab===i?'bg-emerald-400 text-zinc-950':'bg-zinc-800 text-zinc-400'}`}>{i+1}</div><div className="text-[10px] font-semibold text-zinc-200">Step {i+1}</div><div className="mt-0.5 text-[9px] text-zinc-500">Day {s.day}</div></button>)}
+                {stages.map((s,i)=><button key={s.day} onClick={()=>setTab(i)} className={`rounded-xl border px-2 py-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:bg-zinc-800/70 ${tab===i?(i===0?'border-emerald-400/60 bg-emerald-400/[.10] shadow-[inset_0_0_0_1px_rgba(52,211,153,.08)]':i===1?'border-amber-400/60 bg-amber-400/[.08] shadow-[inset_0_0_0_1px_rgba(251,191,36,.08)]':'border-rose-400/60 bg-rose-400/[.08] shadow-[inset_0_0_0_1px_rgba(251,113,133,.08)]'):'border-zinc-800 bg-zinc-900/40 hover:border-zinc-600'}`} ><div className={`mb-2 flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold ${tab===i?'bg-emerald-400 text-zinc-950':'bg-zinc-800 text-zinc-400'}`}>{i+1}</div><div className={`text-[10px] font-semibold ${tab===i?(i===0?'text-emerald-300':i===1?'text-amber-300':'text-rose-300'):'text-zinc-200'}`}>Step {i+1}</div><div className="mt-0.5 text-[9px] text-zinc-500">Day {s.day}</div></button>)}
               </div>
               <div className="px-5 pb-5 pt-4">
                 <div className="mb-3 flex items-center justify-between"><div><div className="text-[12px] font-semibold text-zinc-200">{currentStage.name}</div><div className="mt-0.5 text-[10px] text-zinc-500">Send {currentStage.day} day{currentStage.day>1?'s':''} after due date</div></div><span className={`rounded-md px-2 py-1 text-[9px] font-semibold ${tab===0?'bg-emerald-500/10 text-emerald-300':tab===1?'bg-amber-500/10 text-amber-300':'bg-rose-500/10 text-rose-300'}`}>EMAIL TEMPLATE</span></div>
                 <div className="rounded-xl border border-zinc-800 bg-[#0d0d10]">
                   <div className="flex items-center justify-between border-b border-zinc-800 px-3.5 py-3"><div className="flex min-w-0 items-center gap-2 text-[10px] text-zinc-500"><Mail size={13}/><span className="truncate">To: {selected.email}</span></div><button onClick={copyEmail} className="flex shrink-0 items-center gap-1 text-[10px] text-zinc-500 hover:text-emerald-400">{copied?<Check size={12}/>:<Copy size={12}/>} {copied?'Copied':'Copy'}</button></div>
-                  <div className="px-3.5 py-3"><div className="text-[10px] font-semibold text-zinc-300">Subject: <span className="font-normal text-zinc-400">{currentStage.subject}</span></div><pre className="mt-3 whitespace-pre-wrap font-sans text-[10.5px] leading-[1.75] text-zinc-400">{emailBody}</pre></div>
+                  <div className="px-3.5 py-3"><div className="text-[10px] font-semibold text-zinc-300">Subject: <span className="font-normal text-zinc-400">{tab===0?`Quick heads-up regarding invoice #${selected.id.replace('INV-','')} for ${selected.client}`:currentStage.subject}</span></div><pre className="mt-3 whitespace-pre-wrap font-sans text-[10.5px] leading-[1.75] text-zinc-400">{emailBody}</pre></div>
                 </div>
                 <div className="mt-4 flex items-start gap-2 rounded-lg border border-zinc-800/80 bg-zinc-900/50 p-3"><CalendarClock size={14} className="mt-0.5 shrink-0 text-emerald-400"/><p className="text-[10px] leading-relaxed text-zinc-500">Sequence timing is based on the invoice due date. You can review each message before activating.</p></div>
                 <button onClick={activate} disabled={selected.active} className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 text-[11px] font-bold text-zinc-950 shadow-[0_8px_28px_rgba(52,211,153,.12)] transition hover:bg-emerald-300 disabled:cursor-default disabled:bg-emerald-400/15 disabled:text-emerald-300"><Zap size={15} fill="currentColor"/>{selected.active?'Sequence is active':'Activate automated sequence'}</button>
