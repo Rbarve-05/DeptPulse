@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Activity, ArrowDownRight, ArrowUpRight, Bell, Check, ChevronDown, ChevronRight,
   CircleHelp, Clock3, Command, Download, FileText, Filter, Mail, MoreHorizontal,
@@ -6,11 +6,7 @@ import {
   TrendingUp, AlertTriangle, CheckCircle2, Copy, ExternalLink
 } from 'lucide-react'
 
-const initialInvoices = [
-  { id:'INV-2049', client:'PixelCraft Cinema', email:'accounts@pixelcraftcinema.com', project:'Music Video Post-Production', amount:68000, days:14, active:true, initials:'PC', color:'from-violet-500/25 to-indigo-500/10' },
-  { id:'INV-2046', client:'Apex Marketing Group', email:'finance@apexmarketinggroup.co', project:'3D Brand Animation Campaign', amount:42500, days:7, active:true, initials:'AM', color:'from-amber-500/20 to-orange-500/10' },
-  { id:'INV-2044', client:'Vanguard Fashion Film Co.', email:'production@vanguardfashionfilm.co', project:'Luxury Collection Campaign Film', amount:34500, days:2, active:false, initials:'VF', color:'from-cyan-500/20 to-sky-500/10' },
-]
+const API_URL = import.meta.env.VITE_API_URL || '/api'
 
 const money = n => new Intl.NumberFormat('en-IN', { style:'currency', currency:'INR', maximumFractionDigits:0 }).format(n)
 const stages = [
@@ -35,8 +31,10 @@ function StatCard({label,value,detail,icon:Icon,accent='emerald',trend}) {
 }
 
 function App() {
-  const [invoices,setInvoices] = useState(initialInvoices)
-  const [selectedId,setSelectedId] = useState(initialInvoices[0].id)
+  const [invoices,setInvoices] = useState([])
+  const [selectedId,setSelectedId] = useState(null)
+  const [loading,setLoading] = useState(true)
+  const [apiError,setApiError] = useState('')
   const [tab,setTab] = useState(0)
   const [modal,setModal] = useState(false)
   const [toast,setToast] = useState('')
@@ -44,7 +42,7 @@ function App() {
   const [filter,setFilter] = useState('all')
   const [form,setForm] = useState({client:'',email:'',amount:'',days:''})
   const [copied,setCopied] = useState(false)
-  const selected = invoices.find(x=>x.id===selectedId) || invoices[0]
+  const selected = invoices.find(x=>x.id===selectedId) || invoices[0] || null
   const total = invoices.reduce((s,x)=>s+x.amount,0)
   const overdue = invoices.length
   const avg = invoices.length ? Math.round(invoices.reduce((s,x)=>s+x.days,0)/invoices.length) : 0
@@ -53,15 +51,41 @@ function App() {
   const emailBody = selected ? currentStage.body(selected.client,money(selected.amount)).replace(/invoice /i, `invoice #${selected.id.replace('INV-','')} `) : ''
   const notify = msg => { setToast(msg); window.clearTimeout(window.__debtToast); window.__debtToast = window.setTimeout(()=>setToast(''),3800) }
 
-  function addInvoice(e) {
+  useEffect(() => {
+    let cancelled = false
+    async function loadInvoices() {
+      try {
+        const response = await fetch(`${API_URL}/invoices`)
+        if (!response.ok) throw new Error('Could not load invoices from the server.')
+        const data = await response.json()
+        if (!cancelled) { setInvoices(data); setSelectedId(data[0]?.id || null); setApiError('') }
+      } catch (error) { if (!cancelled) setApiError(error.message || 'Unable to connect to the DebtPulse API.') }
+      finally { if (!cancelled) setLoading(false) }
+    }
+    loadInvoices()
+    return () => { cancelled = true }
+  }, [])
+
+  async function addInvoice(e) {
     e.preventDefault()
-    const item = { id:`INV-${Math.floor(2050+Math.random()*7000)}`, client:form.client.trim(), email:form.email.trim(), project:'New creative production project', amount:Number(form.amount), days:Number(form.days), active:false, initials:form.client.trim().split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase(), color:'from-emerald-500/20 to-teal-500/10' }
-    setInvoices(old=>[item,...old]); setSelectedId(item.id); setTab(0); setModal(false); setForm({client:'',email:'',amount:'',days:''})
-    notify('Invoice added. Your chase sequence is ready to review.')
+    setApiError('')
+    try {
+      const response = await fetch(`${API_URL}/invoices`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ client:form.client.trim(), email:form.email.trim(), amount:Number(form.amount), days:Number(form.days), project:'New creative production project' }) })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.message || 'Could not save this invoice.')
+      setInvoices(old=>[data,...old]); setSelectedId(data.id); setTab(0); setModal(false); setForm({client:'',email:'',amount:'',days:''})
+      notify('Invoice saved to your database. Your chase sequence is ready to review.')
+    } catch (error) { setApiError(error.message || 'Unable to save invoice.') }
   }
-  function activate() {
-    setInvoices(old=>old.map(x=>x.id===selected.id?{...x,active:true}:x))
-    notify('Sequence activated. DebtPulse system is now managing client collection in the background.')
+  async function activate() {
+    if (!selected) return
+    try {
+      const response = await fetch(`${API_URL}/invoices/${selected.id}/activate`, { method:'PATCH' })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.message || 'Could not activate sequence.')
+      setInvoices(old=>old.map(x=>x.id===data.id?data:x))
+      notify('Sequence status saved. Automated email delivery is not connected yet.')
+    } catch (error) { setApiError(error.message || 'Unable to update sequence.') }
   }
   function copyEmail() {
     navigator.clipboard?.writeText(`Subject: ${currentStage.subject}\n\n${emailBody}`)
@@ -81,6 +105,8 @@ function App() {
       </header>
 
       <main className="pt-9">
+        {apiError && <div className="mb-5 flex items-start justify-between gap-3 rounded-xl border border-rose-500/25 bg-rose-500/[.07] px-4 py-3 text-[11px] text-rose-200"><span>{apiError} Check that the API server is running and MongoDB is connected.</span><button onClick={()=>setApiError('')} aria-label="Dismiss error"><X size={14}/></button></div>}
+        {loading && <div className="mb-5 rounded-xl border border-zinc-800 bg-zinc-900/60 px-4 py-3 text-[11px] text-zinc-400">Loading invoices from your database…</div>}
         <div className="mb-7 flex flex-col justify-between gap-5 md:flex-row md:items-end">
           <div><div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.18em] text-emerald-400"><span className="h-px w-5 bg-emerald-400"/> Monday, 09 November 2026</div><div className="flex flex-wrap items-center gap-3"><h1 className="font-display text-[32px] font-semibold tracking-[-.04em] text-white sm:text-[38px]">Good afternoon, Studio team<span className="text-emerald-400">.</span></h1><span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/[.07] px-3 py-1.5 text-[10px] font-medium text-emerald-300"><span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50"/><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400"/></span>System Status: Active Monitoring <span className="text-emerald-700">·</span> 4 webhooks connected</span></div><p className="mt-1.5 text-sm text-zinc-500">A clear view of what’s owed, what’s overdue, and what happens next.</p></div>
           <button onClick={()=>setModal(true)} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 text-[12px] font-bold text-zinc-950 shadow-[0_8px_28px_rgba(52,211,153,.13)] transition hover:bg-emerald-300 active:scale-[.98]"><Plus size={16} strokeWidth={2.5}/> Add new late invoice</button>
@@ -107,15 +133,15 @@ function App() {
                 <div className="col-span-2 flex items-center justify-between sm:col-span-1 sm:block"><StagePill days={item.days}/><span className={`mt-1.5 block text-[10px] ${item.active?'text-emerald-500':'text-zinc-600'}`}>{item.active?'● Sequence active':'○ Awaiting activation'}</span></div>
                 <ChevronRight size={15} className="hidden text-zinc-600 transition group-hover:translate-x-0.5 group-hover:text-emerald-400 sm:block"/>
               </button>)}
-              {filtered.length===0&&<div className="px-5 py-12 text-center text-xs text-zinc-500">No invoices match your search.</div>}
+              {!loading && filtered.length===0&&<div className="px-5 py-12 text-center text-xs text-zinc-500">No invoices match your search.</div>}
             </div>
-            <div className="flex items-center justify-between border-t border-zinc-800/70 px-5 py-3"><span className="text-[10px] text-zinc-600">Showing {filtered.length} of {invoices.length} invoices</span><span className="flex items-center gap-1 text-[10px] text-zinc-600"><ShieldCheck size={12} className="text-emerald-500"/> Your data stays in this demo</span></div>
+            <div className="flex items-center justify-between border-t border-zinc-800/70 px-5 py-3"><span className="text-[10px] text-zinc-600">Showing {filtered.length} of {invoices.length} invoices</span><span className="flex items-center gap-1 text-[10px] text-zinc-600"><ShieldCheck size={12} className="text-emerald-500"/> Persisted in MongoDB</span></div>
           </div>
 
           <div className="panel overflow-hidden rounded-2xl">
             <div className="flex items-start justify-between border-b border-zinc-800/80 p-5">
               <div><div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[.16em] text-emerald-400"><Sparkles size={13}/> Smart follow-up studio</div><h2 className="mt-2 font-display text-[17px] font-semibold">Escalation plan</h2><p className="mt-1 text-[11px] text-zinc-500">Personalized emails, ready when you are.</p></div>
-              <div className="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/[.06] px-2.5 py-2"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400"/><span className="text-[9px] font-semibold text-emerald-300">Automated Follow-up Mode: ON</span></div>
+              <div className="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/[.06] px-2.5 py-2"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400"/><span className="text-[9px] font-semibold text-emerald-300">Database connected</span></div>
             </div>
             {selected ? <>
               <div className="flex items-center justify-between gap-3 border-b border-zinc-800/70 bg-zinc-900/40 px-5 py-3"><div className="min-w-0"><div className="truncate text-[12px] font-semibold">{selected.client}</div><div className="mt-0.5 truncate text-[10px] text-zinc-500">{selected.email}</div></div><div className="shrink-0 text-right"><div className="text-[13px] font-bold tabular-nums">{money(selected.amount)}</div><div className="text-[9px] text-zinc-500">Outstanding</div></div></div>
@@ -130,7 +156,7 @@ function App() {
                 </div>
                 <div className="mt-4 flex items-start gap-2 rounded-lg border border-zinc-800/80 bg-zinc-900/50 p-3"><CalendarClock size={14} className="mt-0.5 shrink-0 text-emerald-400"/><p className="text-[10px] leading-relaxed text-zinc-500">Sequence timing is based on the invoice due date. You can review each message before activating.</p></div>
                 <button onClick={activate} disabled={selected.active} className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 text-[11px] font-bold text-zinc-950 shadow-[0_8px_28px_rgba(52,211,153,.12)] transition hover:bg-emerald-300 disabled:cursor-default disabled:bg-emerald-400/15 disabled:text-emerald-300"><Zap size={15} fill="currentColor"/>{selected.active?'Sequence is active':'Activate automated sequence'}</button>
-                <p className="mt-2 text-center text-[9px] text-zinc-600">Demo only · No emails are sent automatically</p>
+                <p className="mt-2 text-center text-[9px] text-zinc-600">Invoice and sequence status are saved · Email delivery is not connected</p>
               </div>
             </>:<div className="p-8 text-center text-xs text-zinc-500">Add an invoice to build an escalation plan.</div>}
           </div>
@@ -146,7 +172,7 @@ function App() {
         <label className="block"><span className="mb-1.5 block text-[10px] font-semibold text-zinc-400">CLIENT CONTACT EMAIL</span><input required type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="accounts@client.com" className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-xs outline-none transition placeholder:text-zinc-600 focus:border-emerald-400/70"/></label>
         <div className="grid grid-cols-2 gap-3"><label className="block"><span className="mb-1.5 block text-[10px] font-semibold text-zinc-400">INVOICE AMOUNT (₹)</span><input required min="1" type="number" value={form.amount} onChange={e=>setForm({...form,amount:e.target.value})} placeholder="50000" className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-xs outline-none transition placeholder:text-zinc-600 focus:border-emerald-400/70"/></label><label className="block"><span className="mb-1.5 block text-[10px] font-semibold text-zinc-400">DAYS OVERDUE</span><input required min="1" type="number" value={form.days} onChange={e=>setForm({...form,days:e.target.value})} placeholder="5" className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-xs outline-none transition placeholder:text-zinc-600 focus:border-emerald-400/70"/></label></div>
         <div className="rounded-lg border border-emerald-500/15 bg-emerald-500/[.05] p-3 text-[10px] leading-relaxed text-zinc-400"><Sparkles size={13} className="mr-1 inline text-emerald-400"/> Three professional email templates will be personalized using the client and invoice details.</div>
-        <div className="flex gap-2 pt-1"><button type="button" onClick={()=>setModal(false)} className="h-11 flex-1 rounded-xl border border-zinc-700 text-[11px] font-semibold text-zinc-300 hover:bg-zinc-800">Cancel</button><button type="submit" className="flex h-11 flex-[1.6] items-center justify-center gap-2 rounded-xl bg-emerald-400 text-[11px] font-bold text-zinc-950 hover:bg-emerald-300">Generate chase sequence <ChevronRight size={14}/></button></div>
+        <div className="flex gap-2 pt-1"><button type="button" onClick={()=>setModal(false)} className="h-11 flex-1 rounded-xl border border-zinc-700 text-[11px] font-semibold text-zinc-300 hover:bg-zinc-800">Cancel</button><button type="submit" disabled={loading} className="flex h-11 flex-[1.6] items-center justify-center gap-2 rounded-xl bg-emerald-400 text-[11px] font-bold text-zinc-950 hover:bg-emerald-300">Generate chase sequence <ChevronRight size={14}/></button></div>
       </form>
     </div></div>}
     {toast&&<div className="fixed bottom-5 right-5 z-[60] flex max-w-[min(440px,calc(100vw-40px))] items-start gap-3 rounded-xl border border-emerald-500/25 bg-[#111815] px-4 py-3.5 shadow-2xl shadow-black/50"><div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-emerald-400/15 text-emerald-400"><CheckCircle2 size={16}/></div><div><div className="text-[11px] font-semibold text-emerald-300">All set</div><p className="mt-0.5 text-[11px] leading-relaxed text-zinc-300">{toast}</p></div><button onClick={()=>setToast('')} className="ml-1 text-zinc-600 hover:text-white"><X size={14}/></button></div>}
