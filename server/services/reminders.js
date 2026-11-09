@@ -15,7 +15,10 @@ export async function processDueReminders() {
       const overdueSince = invoice.overdueSince || new Date(Date.now() - Number(invoice.days || 0) * DAY_MS)
       const overdueDays = Math.max(0, Math.floor((Date.now() - new Date(overdueSince).getTime()) / DAY_MS))
       const sentDays = new Set((invoice.remindersSent || []).map(item => item.day))
-      const dueStage = REMINDER_DAYS.filter(day => overdueDays >= day && !sentDays.has(day)).at(-1)
+      const highestSentDay = Math.max(0, ...sentDays)
+      // If a sequence is enabled late, send only its highest currently due stage.
+      // Never send an older stage after a later stage has already gone out.
+      const dueStage = REMINDER_DAYS.filter(day => overdueDays >= day && day > highestSentDay).at(-1)
       if (!dueStage) continue
 
       try {
